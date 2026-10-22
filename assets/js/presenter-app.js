@@ -68,9 +68,34 @@ const sessionModal = document.getElementById('session-modal');
 const inputSwitchRoomCode = document.getElementById('input-switch-room-code');
 const recentSessionsList = document.getElementById('recent-sessions-list');
 
+// 관리자 암호 인증 요소
+const adminLockScreen = document.getElementById('admin-lock-screen');
+const formAdminAuth = document.getElementById('form-admin-auth');
+const inputAdminPassword = document.getElementById('input-admin-password');
+const authErrorMsg = document.getElementById('auth-error-msg');
+const btnAdminLock = document.getElementById('btn-admin-lock');
+const btnOpenPwChange = document.getElementById('btn-open-pw-change');
+const pwChangeModal = document.getElementById('pw-change-modal');
+const formChangePassword = document.getElementById('form-change-password');
+
+function getAdminPassword() {
+  return localStorage.getItem('op_flow_admin_password') || '1234';
+}
+
+function checkAdminAuth() {
+  const isAuth = sessionStorage.getItem('op_flow_admin_auth') === 'true';
+  if (isAuth) {
+    adminLockScreen?.classList.add('hidden');
+    initRoomFromURL();
+  } else {
+    adminLockScreen?.classList.remove('hidden');
+    inputAdminPassword?.focus();
+  }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
-  initRoomFromURL();
+  checkAdminAuth();
 });
 
 function setupEventListeners() {
@@ -131,6 +156,57 @@ function setupEventListeners() {
   document.getElementById('btn-open-fb-config')?.addEventListener('click', openFirebaseConfigModal);
   document.getElementById('btn-save-fb-config')?.addEventListener('click', saveFirebaseConfig);
   document.getElementById('btn-close-fb-modal')?.addEventListener('click', closeFirebaseConfigModal);
+
+  // 관리자 인증 & 잠금 이벤트
+  formAdminAuth?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const entered = inputAdminPassword.value;
+    if (entered === getAdminPassword()) {
+      authErrorMsg?.classList.add('hidden');
+      sessionStorage.setItem('op_flow_admin_auth', 'true');
+      adminLockScreen?.classList.add('hidden');
+      initRoomFromURL();
+    } else {
+      authErrorMsg?.classList.remove('hidden');
+      inputAdminPassword.value = '';
+      inputAdminPassword.focus();
+    }
+  });
+
+  btnAdminLock?.addEventListener('click', () => {
+    if (confirm('강사용 화면을 잠그시겠습니까?')) {
+      sessionStorage.removeItem('op_flow_admin_auth');
+      inputAdminPassword.value = '';
+      authErrorMsg?.classList.add('hidden');
+      adminLockScreen?.classList.remove('hidden');
+      inputAdminPassword.focus();
+    }
+  });
+
+  btnOpenPwChange?.addEventListener('click', () => {
+    pwChangeModal?.classList.remove('hidden');
+  });
+
+  formChangePassword?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const currPw = document.getElementById('input-curr-pw').value;
+    const newPw = document.getElementById('input-new-pw').value;
+
+    if (currPw !== getAdminPassword()) {
+      alert('현재 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    if (!newPw || newPw.trim().length < 2) {
+      alert('새 비밀번호를 2자 이상 입력해주세요.');
+      return;
+    }
+
+    localStorage.setItem('op_flow_admin_password', newPw.trim());
+    alert('비밀번호가 성공적으로 변경되었습니다!');
+    pwChangeModal?.classList.add('hidden');
+    document.getElementById('input-curr-pw').value = '';
+    document.getElementById('input-new-pw').value = '';
+  });
 }
 
 /**

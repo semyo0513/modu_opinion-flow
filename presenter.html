@@ -110,6 +110,10 @@
         <button id="btn-fullscreen" title="전체화면" class="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-700/80 transition-all">
           <i data-lucide="maximize" class="w-4 h-4"></i>
         </button>
+
+        <button id="btn-admin-lock" title="화면 잠금" class="p-2 rounded-xl text-amber-300 hover:text-white hover:bg-amber-950/80 border border-amber-800/60 transition-all">
+          <i data-lucide="lock" class="w-4 h-4"></i>
+        </button>
       </div>
 
     </div>
@@ -270,6 +274,91 @@
     </div>
 
   </main>
+
+  <!-- Footer -->
+  <footer class="py-4 text-center text-xs text-slate-500 border-t border-slate-800/80 mt-auto">
+    <p>© 2026. 창순기획 Co. All rights reserved.</p>
+  </footer>
+
+  <!-- Admin Lock Screen Overlay (강사용 화면 접근 암호 보호 게이트) -->
+  <div id="admin-lock-screen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl">
+    <div class="w-full max-w-md glass-panel dark rounded-3xl p-8 border border-indigo-500/40 shadow-2xl text-center relative overflow-hidden">
+      <div class="absolute -top-12 -right-12 w-36 h-36 bg-indigo-500/20 rounded-full blur-2xl"></div>
+      <div class="absolute -bottom-12 -left-12 w-36 h-36 bg-cyan-500/20 rounded-full blur-2xl"></div>
+
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+        <i data-lucide="shield-check" class="w-8 h-8"></i>
+      </div>
+
+      <h2 class="text-2xl font-black text-white mb-2">강사용 화면 보안 인증</h2>
+      <p class="text-slate-400 text-xs mb-6 leading-relaxed">
+        프리젠테이션 제어 및 결과 열람을 위해<br>
+        <strong>관리자 비밀번호</strong>를 입력해주세요.
+      </p>
+
+      <form id="form-admin-auth" class="space-y-4">
+        <div>
+          <input 
+            type="password" 
+            id="input-admin-password" 
+            placeholder="비밀번호 입력 (기본: 1234)" 
+            class="w-full text-center text-lg font-bold tracking-widest bg-slate-900 border-2 border-slate-700 rounded-2xl py-3 px-4 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all font-mono"
+            autocomplete="current-password"
+            autofocus
+            required
+          >
+          <div id="auth-error-msg" class="hidden text-rose-400 text-xs font-semibold mt-2">
+            비밀번호가 일치하지 않습니다. 다시 입력해주세요.
+          </div>
+        </div>
+
+        <button 
+          type="submit" 
+          class="w-full py-3.5 rounded-2xl font-bold text-sm bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white shadow-xl shadow-indigo-500/30 transition-all flex items-center justify-center space-x-2">
+          <span>대시보드 잠금 해제</span>
+          <i data-lucide="unlock" class="w-4 h-4"></i>
+        </button>
+
+        <div class="flex items-center justify-between pt-4 border-t border-slate-800/80 text-[11px] text-slate-500">
+          <span>초기 비밀번호: <strong class="text-slate-400 font-mono">1234</strong></span>
+          <button type="button" id="btn-open-pw-change" class="text-indigo-400 hover:underline">
+            비밀번호 변경
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Password Change Modal -->
+  <div id="pw-change-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" onclick="document.getElementById('pw-change-modal').classList.add('hidden')"></div>
+    <div class="relative w-full max-w-sm bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl z-10">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+        <h3 class="text-base font-bold text-white flex items-center">
+          <i data-lucide="key" class="w-4 h-4 mr-2 text-indigo-400"></i>
+          관리자 비밀번호 변경
+        </h3>
+        <button onclick="document.getElementById('pw-change-modal').classList.add('hidden')" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="form-change-password" class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">현재 비밀번호</label>
+          <input type="password" id="input-curr-pw" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">새 비밀번호</label>
+          <input type="password" id="input-new-pw" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+        <div class="pt-2 flex justify-end space-x-2">
+          <button type="button" onclick="document.getElementById('pw-change-modal').classList.add('hidden')" class="px-3 py-1.5 rounded-xl text-xs bg-slate-800 text-slate-300">취소</button>
+          <button type="submit" class="px-4 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white">변경 저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- Spotlight Zoom Modal (주관식 카드 확대 모달) -->
   <div id="zoom-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
