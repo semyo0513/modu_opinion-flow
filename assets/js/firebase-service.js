@@ -137,18 +137,20 @@ class RealtimePollService {
         const snap = await get(roomsRef);
         if (snap.exists()) {
           const val = snap.val();
-          const list = Object.entries(val).map(([code, room]) => {
-            const questions = room.questions || [];
-            const responseCount = room.responses ? Object.values(room.responses).reduce((acc, cur) => acc + (typeof cur === 'object' ? Object.keys(cur).length : 1), 0) : 0;
-            return {
-              code: code,
-              title: room.meta?.title || '실시간 의견수렴',
-              questionCount: questions.length || 1,
-              responseCount: responseCount,
-              createdAt: room.meta?.createdAt || Date.now(),
-              updatedAt: room.meta?.updatedAt || room.meta?.createdAt || Date.now()
-            };
-          });
+          const list = Object.entries(val)
+            .filter(([code]) => !code.startsWith('_')) // 내부 설정(_settings 등) 제외
+            .map(([code, room]) => {
+              const questions = room.questions || [];
+              const responseCount = room.responses ? Object.values(room.responses).reduce((acc, cur) => acc + (typeof cur === 'object' ? Object.keys(cur).length : 1), 0) : 0;
+              return {
+                code: code,
+                title: room.meta?.title || '실시간 의견수렴',
+                questionCount: questions.length || 1,
+                responseCount: responseCount,
+                createdAt: room.meta?.createdAt || Date.now(),
+                updatedAt: room.meta?.updatedAt || room.meta?.createdAt || Date.now()
+              };
+            });
           // 최신 생성/업데이트 순 정렬
           list.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
           return list;
@@ -160,6 +162,39 @@ class RealtimePollService {
 
     // Firebase 목록 조회가 막혀있거나 오프라인일 때는 로컬스토리지 기록 반환
     return this.getRecentSessions();
+  }
+
+  /**
+   * 관리자 비밀번호를 Firebase 클라우드에서 조회
+   */
+  async getAdminPassword() {
+    if (this.isFirebaseReady) {
+      try {
+        const pwRef = ref(this.db, 'rooms/_settings/admin/password');
+        const snap = await get(pwRef);
+        if (snap.exists() && snap.val()) {
+          return String(snap.val());
+        }
+      } catch (err) {
+        console.warn('[PollService] 관리자 비밀번호 클라우드 조회 실패:', err);
+      }
+    }
+    return localStorage.getItem('op_flow_admin_password') || '1234';
+  }
+
+  /**
+   * 관리자 비밀번호를 Firebase 클라우드 및 로컬에 동시 저장
+   */
+  async setAdminPassword(newPassword) {
+    localStorage.setItem('op_flow_admin_password', newPassword);
+    if (this.isFirebaseReady) {
+      try {
+        const pwRef = ref(this.db, 'rooms/_settings/admin/password');
+        await set(pwRef, newPassword);
+      } catch (err) {
+        console.warn('[PollService] 관리자 비밀번호 클라우드 저장 실패:', err);
+      }
+    }
   }
 
   /**

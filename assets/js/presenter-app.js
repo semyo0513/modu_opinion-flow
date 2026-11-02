@@ -78,8 +78,8 @@ const btnOpenPwChange = document.getElementById('btn-open-pw-change');
 const pwChangeModal = document.getElementById('pw-change-modal');
 const formChangePassword = document.getElementById('form-change-password');
 
-function getAdminPassword() {
-  return localStorage.getItem('op_flow_admin_password') || '1234';
+async function getAdminPassword() {
+  return await pollService.getAdminPassword();
 }
 
 function checkAdminAuth() {
@@ -159,10 +159,11 @@ function setupEventListeners() {
   document.getElementById('btn-close-fb-modal')?.addEventListener('click', closeFirebaseConfigModal);
 
   // 관리자 인증 & 잠금 이벤트
-  formAdminAuth?.addEventListener('submit', (e) => {
+  formAdminAuth?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const entered = inputAdminPassword.value;
-    if (entered === getAdminPassword()) {
+    const realPw = await getAdminPassword();
+    if (entered === realPw) {
       authErrorMsg?.classList.add('hidden');
       sessionStorage.setItem('op_flow_admin_auth', 'true');
       adminLockScreen?.classList.add('hidden');
@@ -188,12 +189,13 @@ function setupEventListeners() {
     pwChangeModal?.classList.remove('hidden');
   });
 
-  formChangePassword?.addEventListener('submit', (e) => {
+  formChangePassword?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const currPw = document.getElementById('input-curr-pw').value;
     const newPw = document.getElementById('input-new-pw').value;
+    const realPw = await getAdminPassword();
 
-    if (currPw !== getAdminPassword()) {
+    if (currPw !== realPw) {
       alert('현재 비밀번호가 일치하지 않습니다.');
       return;
     }
@@ -202,8 +204,8 @@ function setupEventListeners() {
       return;
     }
 
-    localStorage.setItem('op_flow_admin_password', newPw.trim());
-    alert('비밀번호가 성공적으로 변경되었습니다!');
+    await pollService.setAdminPassword(newPw.trim());
+    alert('비밀번호가 Firebase 클라우드에 성공적으로 변경 저장되었습니다!\n어떤 브라우저나 시크릿 모드에서도 변경된 비밀번호로 적용됩니다.');
     pwChangeModal?.classList.add('hidden');
     document.getElementById('input-curr-pw').value = '';
     document.getElementById('input-new-pw').value = '';
