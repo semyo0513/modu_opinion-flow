@@ -37,6 +37,7 @@ const btnSubmitAnother = document.getElementById('btn-submit-another');
 
 window.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
+  pollService.updateSyncStatusUI(pollService.isFirebaseReady, pollService.lastError);
   checkUrlParams();
 });
 

@@ -15,8 +15,8 @@ import {
   remove 
 } from 'https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js';
 
-const savedConfig = localStorage.getItem('op_flow_firebase_config');
-export const DEFAULT_FIREBASE_CONFIG = savedConfig ? JSON.parse(savedConfig) : {
+// 하드코딩된 최신 Firebase 설정
+const BUILTIN_FIREBASE_CONFIG = {
   apiKey: "AIzaSyAz8C96b4LoFyUszkxb-775f2xWmDjRUHk",
   authDomain: "opinion-flow-d228f.firebaseapp.com",
   databaseURL: "https://opinion-flow-d228f-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -26,11 +26,30 @@ export const DEFAULT_FIREBASE_CONFIG = savedConfig ? JSON.parse(savedConfig) : {
   appId: "1:484960458808:web:5a399316b430b47e002ecd"
 };
 
+// 로컬스토리지에 저장된 설정이 유효한지 검증하여 적용 (빈 값이거나 누락 시 기본값 우선)
+let resolvedConfig = BUILTIN_FIREBASE_CONFIG;
+try {
+  const saved = localStorage.getItem('op_flow_firebase_config');
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    if (parsed && parsed.apiKey && parsed.databaseURL) {
+      resolvedConfig = parsed;
+    } else {
+      localStorage.removeItem('op_flow_firebase_config');
+    }
+  }
+} catch (e) {
+  localStorage.removeItem('op_flow_firebase_config');
+}
+
+export const DEFAULT_FIREBASE_CONFIG = resolvedConfig;
+
 class RealtimePollService {
   constructor() {
     this.isFirebaseReady = false;
     this.app = null;
     this.db = null;
+    this.lastError = null;
     this.channel = new BroadcastChannel('opinion_flow_sync');
     this.initFirebase();
   }
@@ -39,17 +58,39 @@ class RealtimePollService {
     const config = customConfig || DEFAULT_FIREBASE_CONFIG;
     if (config && config.apiKey && config.databaseURL) {
       try {
+        // 중복 초기화 방지: 고유 이름 지정
         this.app = initializeApp(config, 'opinion-flow-' + Date.now());
         this.db = getDatabase(this.app);
         this.isFirebaseReady = true;
-        console.log('[PollService] Firebase Realtime Database 연결 성공!');
+        this.lastError = null;
+        console.log('[PollService] Firebase Realtime Database 연결 성공!', config.databaseURL);
+        this.updateSyncStatusUI(true);
       } catch (err) {
         console.warn('[PollService] Firebase 초기화 실패. 로컬 데모 모드로 작동합니다.', err);
         this.isFirebaseReady = false;
+        this.lastError = err.message;
+        this.updateSyncStatusUI(false, err.message);
       }
     } else {
-      console.log('[PollService] Firebase 설정이 없어 로컬/데모 모드(BroadcastChannel)로 시작합니다.');
+      console.log('[PollService] Firebase 설정이 없어 로컬/데모 모드로 시작합니다.');
       this.isFirebaseReady = false;
+      this.updateSyncStatusUI(false, '설정값 누락');
+    }
+  }
+
+  updateSyncStatusUI(isConnected, errorMsg = '') {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('firebase-status-badge');
+    if (!el) return;
+
+    if (isConnected) {
+      el.className = "flex items-center text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+      el.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span> Firebase 실시간 연동됨`;
+      el.title = "Firebase Realtime Database와 실시간 동기화 중입니다.";
+    } else {
+      el.className = "flex items-center text-[11px] font-semibold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 cursor-pointer";
+      el.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 mr-1.5"></span> 로컬 오프라인 모드`;
+      el.title = `Firebase 미연결: ${errorMsg || '로컬 모드'}. 클릭하여 설정 확인`;
     }
   }
 
@@ -151,6 +192,9 @@ class RealtimePollService {
       return onValue(roomRef, (snapshot) => {
         const val = snapshot.val();
         callback(val);
+      }, (err) => {
+        console.error('[PollService] Firebase 구독 오류:', err);
+        alert(`Firebase 데이터 구독 권한 오류: ${err.message}\n(Firebase 규칙 설정을 확인해주세요)`);
       });
     } else {
       const checkLocal = () => {

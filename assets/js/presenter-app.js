@@ -95,6 +95,7 @@ function checkAdminAuth() {
 
 window.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
+  pollService.updateSyncStatusUI(pollService.isFirebaseReady, pollService.lastError);
   checkAdminAuth();
 });
 
