@@ -108,13 +108,13 @@ class RealtimePollService {
     return code;
   }
 
-  // 최근 방문/생성 세션 관리
+  // 최근 방문/생성 세션 로컬 보관 (오프라인 캐시 겸용)
   saveRecentSession(roomCode, title) {
     try {
       let recents = JSON.parse(localStorage.getItem('op_flow_recent_rooms') || '[]');
       recents = recents.filter(r => r.code !== roomCode);
       recents.unshift({ code: roomCode, title: title || '실시간 의견수렴', time: Date.now() });
-      if (recents.length > 10) recents = recents.slice(0, 10);
+      if (recents.length > 20) recents = recents.slice(0, 20);
       localStorage.setItem('op_flow_recent_rooms', JSON.stringify(recents));
     } catch (e) {}
   }
@@ -125,6 +125,41 @@ class RealtimePollService {
     } catch (e) {
       return [];
     }
+  }
+
+  /**
+   * Firebase 클라우드 전체 세션 목록 실시간 조회
+   */
+  async getAllSessions() {
+    if (this.isFirebaseReady) {
+      try {
+        const roomsRef = ref(this.db, 'rooms');
+        const snap = await get(roomsRef);
+        if (snap.exists()) {
+          const val = snap.val();
+          const list = Object.entries(val).map(([code, room]) => {
+            const questions = room.questions || [];
+            const responseCount = room.responses ? Object.values(room.responses).reduce((acc, cur) => acc + (typeof cur === 'object' ? Object.keys(cur).length : 1), 0) : 0;
+            return {
+              code: code,
+              title: room.meta?.title || '실시간 의견수렴',
+              questionCount: questions.length || 1,
+              responseCount: responseCount,
+              createdAt: room.meta?.createdAt || Date.now(),
+              updatedAt: room.meta?.updatedAt || room.meta?.createdAt || Date.now()
+            };
+          });
+          // 최신 생성/업데이트 순 정렬
+          list.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+          return list;
+        }
+      } catch (err) {
+        console.warn('[PollService] Firebase 전체 세션 목록 조회 실패 (권한 규칙 확인 필요):', err);
+      }
+    }
+
+    // Firebase 목록 조회가 막혀있거나 오프라인일 때는 로컬스토리지 기록 반환
+    return this.getRecentSessions();
   }
 
   /**

@@ -66,3 +66,21 @@
 4. **강의 진행**:
    - 대형 스크린에 `presenter.html`을 띄우고 QR 코드를 안내합니다.
    - 참여자 수가 올라가면 [결과 공개]를 누르고, 질문 강평 후 [다음 질문]으로 넘어가며 몰입도 높은 강의를 진행합니다!
+
+---
+
+## ⚡ Firebase 보안 규칙(Rules) 필수 설정 안내
+
+Firebase 콘솔([console.firebase.google.com](https://console.firebase.google.com/))의 **Realtime Database > 규칙(Rules)** 탭에서 다른 세션 목록을 조회하고 실시간 동기화할 수 있도록 아래와 같이 규칙을 설정하고 **[게시(Publish)]**해주세요:
+
+```json
+{
+  "rules": {
+    "rooms": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
+```
+*(또는 최상위 전체 허용: `{"rules": {".read": true, ".write": true}}`)*

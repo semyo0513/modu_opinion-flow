@@ -502,10 +502,18 @@
           </button>
         </div>
 
-        <!-- 최근 방문/생성 세션 목록 -->
+        <!-- 세션 목록 (Firebase 클라우드 연동) -->
         <div class="pt-3 border-t border-slate-800">
-          <div class="text-xs font-bold text-slate-400 mb-2">최근 세션 기록</div>
-          <div id="recent-sessions-list" class="space-y-2 max-h-48 overflow-y-auto">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-slate-300 flex items-center">
+              <i data-lucide="cloud" class="w-3.5 h-3.5 mr-1 text-cyan-400"></i>
+              세션 목록 (클라우드/최근)
+            </span>
+            <button onclick="renderRecentSessions()" class="text-[11px] text-indigo-400 hover:underline flex items-center">
+              <i data-lucide="refresh-cw" class="w-3 h-3 mr-1"></i> 새로고침
+            </button>
+          </div>
+          <div id="recent-sessions-list" class="space-y-2 max-h-56 overflow-y-auto">
             <!-- 동적 주입 -->
           </div>
         </div>

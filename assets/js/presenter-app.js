@@ -866,31 +866,61 @@ async function handleResetSessionResponses() {
 /**
  * 2) 다른 세션 열기 / 세션 관리 모달
  */
-function openSessionModal() {
+async function openSessionModal() {
   inputSwitchRoomCode.value = '';
-  renderRecentSessions();
   sessionModal.classList.remove('hidden');
+  await renderRecentSessions();
 }
 
-function renderRecentSessions() {
-  const recents = pollService.getRecentSessions();
-  if (recents.length === 0) {
-    recentSessionsList.innerHTML = `<div class="text-xs text-slate-500 py-2">최근 방문한 세션 기록이 없습니다.</div>`;
+async function renderRecentSessions() {
+  recentSessionsList.innerHTML = `
+    <div class="text-xs text-indigo-400 py-4 flex items-center justify-center space-x-2">
+      <span class="animate-spin inline-block">&#9696;</span>
+      <span>Firebase에서 세션 목록을 불러오는 중...</span>
+    </div>
+  `;
+
+  const sessions = await pollService.getAllSessions();
+
+  if (!sessions || sessions.length === 0) {
+    recentSessionsList.innerHTML = `<div class="text-xs text-slate-500 py-3 text-center">불러올 수 있는 세션 기록이 없습니다.</div>`;
     return;
   }
 
-  recentSessionsList.innerHTML = recents.map(r => `
-    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-800 border border-slate-800 transition-all cursor-pointer" onclick="window.switchSessionTo('${r.code}')">
-      <div>
-        <span class="font-bold font-mono text-sm text-indigo-300 mr-2">${r.code}</span>
-        <span class="text-xs text-slate-300">${escapeHtml(r.title)}</span>
+  recentSessionsList.innerHTML = sessions.map(r => {
+    const isCurrent = (r.code === currentRoomCode);
+    const dateStr = new Date(r.updatedAt || r.createdAt || r.time || Date.now()).toLocaleDateString('ko-KR');
+    const badgeCurrent = isCurrent 
+      ? `<span class="ml-2 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">현재 열림</span>` 
+      : '';
+
+    return `
+      <div class="flex items-center justify-between p-3 rounded-xl ${isCurrent ? 'bg-indigo-950/50 border-indigo-500/60' : 'bg-slate-950/60 hover:bg-slate-800 border-slate-800'} border transition-all cursor-pointer group" onclick="window.switchSessionTo('${r.code}')">
+        <div class="flex-1 min-w-0 pr-3">
+          <div class="flex items-center">
+            <span class="font-bold font-mono text-sm text-indigo-300 mr-2 group-hover:text-cyan-300">${r.code}</span>
+            <span class="text-xs text-slate-200 font-medium truncate">${escapeHtml(r.title)}</span>
+            ${badgeCurrent}
+          </div>
+          <div class="text-[11px] text-slate-500 mt-0.5 flex items-center space-x-2">
+            ${r.questionCount ? `<span>질문 ${r.questionCount}개</span>` : ''}
+            ${r.responseCount !== undefined ? `<span>· 응답 ${r.responseCount}건</span>` : ''}
+          </div>
+        </div>
+        <div class="text-right">
+          <span class="text-[10px] text-slate-500 block">${dateStr}</span>
+          <span class="text-xs text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">열기 &rarr;</span>
+        </div>
       </div>
-      <span class="text-[10px] text-slate-500">${new Date(r.time).toLocaleDateString('ko-KR')}</span>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 window.switchSessionTo = (code) => {
+  if (code === currentRoomCode) {
+    sessionModal.classList.add('hidden');
+    return;
+  }
   window.location.search = `?room=${code}`;
 };
 
@@ -900,12 +930,23 @@ async function handleSwitchRoomCode() {
     alert('이동할 6자리 방 코드를 입력해주세요.');
     return;
   }
-  const exists = await pollService.getRoom(code);
-  if (!exists) {
-    alert('존재하지 않는 방 코드입니다. 코드를 다시 확인해주세요.');
-    return;
+  const btn = document.getElementById('btn-switch-room');
+  if (btn) btn.textContent = '확인 중...';
+
+  try {
+    const exists = await pollService.getRoom(code);
+    if (!exists) {
+      alert(`방 코드 [${code}]를 찾을 수 없습니다.\n코드를 다시 확인하거나, Firebase 규칙을 확인해주세요.`);
+      return;
+    }
+    // 세션 기록에 추가
+    pollService.saveRecentSession(code, exists.meta?.title || '실시간 의견수렴');
+    window.location.search = `?room=${code}`;
+  } catch (err) {
+    alert('세션 확인 중 오류가 발생했습니다: ' + err.message);
+  } finally {
+    if (btn) btn.textContent = '세션 열기';
   }
-  window.location.search = `?room=${code}`;
 }
 
 async function handleCreateNewSession() {
