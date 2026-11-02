@@ -418,6 +418,26 @@ class RealtimePollService {
   }
 
   /**
+   * 세션 완전 삭제 (Firebase 클라우드 및 로컬에서 영구 삭제)
+   */
+  async deleteRoom(roomCode) {
+    if (this.isFirebaseReady) {
+      const roomRef = ref(this.db, `rooms/${roomCode}`);
+      await remove(roomRef);
+    }
+    localStorage.removeItem(`op_room_${roomCode}`);
+
+    // 최근 목록에서도 제거
+    try {
+      let recents = JSON.parse(localStorage.getItem('op_flow_recent_rooms') || '[]');
+      recents = recents.filter(r => r.code !== roomCode);
+      localStorage.setItem('op_flow_recent_rooms', JSON.stringify(recents));
+    } catch (e) {}
+
+    this.channel.postMessage({ type: 'ROOM_DELETED', roomCode });
+  }
+
+  /**
    * 공감(하트) 토글
    */
   async toggleLike(roomCode, questionId, responseId) {

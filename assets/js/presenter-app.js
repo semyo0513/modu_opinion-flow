@@ -897,8 +897,8 @@ async function renderRecentSessions() {
       : '';
 
     return `
-      <div class="flex items-center justify-between p-3 rounded-xl ${isCurrent ? 'bg-indigo-950/50 border-indigo-500/60' : 'bg-slate-950/60 hover:bg-slate-800 border-slate-800'} border transition-all cursor-pointer group" onclick="window.switchSessionTo('${r.code}')">
-        <div class="flex-1 min-w-0 pr-3">
+      <div class="flex items-center justify-between p-3 rounded-xl ${isCurrent ? 'bg-indigo-950/50 border-indigo-500/60' : 'bg-slate-950/60 hover:bg-slate-800 border-slate-800'} border transition-all group">
+        <div class="flex-1 min-w-0 pr-2 cursor-pointer" onclick="window.switchSessionTo('${r.code}')">
           <div class="flex items-center">
             <span class="font-bold font-mono text-sm text-indigo-300 mr-2 group-hover:text-cyan-300">${r.code}</span>
             <span class="text-xs text-slate-200 font-medium truncate">${escapeHtml(r.title)}</span>
@@ -909,14 +909,107 @@ async function renderRecentSessions() {
             ${r.responseCount !== undefined ? `<span>· 응답 ${r.responseCount}건</span>` : ''}
           </div>
         </div>
-        <div class="text-right">
-          <span class="text-[10px] text-slate-500 block">${dateStr}</span>
-          <span class="text-xs text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">열기 &rarr;</span>
+
+        <div class="flex items-center space-x-1.5 pl-2 border-l border-slate-800/80">
+          <button title="이 세션 데이터 다운로드 (CSV)" onclick="event.stopPropagation(); window.exportSpecificSessionCSV('${r.code}')" class="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-700/80 transition-all">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          </button>
+          <button title="세션 완전히 삭제" onclick="event.stopPropagation(); window.deleteSpecificSession('${r.code}', '${escapeHtml(r.title)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/60 transition-all">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+          <button title="세션 열기" onclick="window.switchSessionTo('${r.code}')" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600 hover:text-white transition-all ml-1">
+            열기
+          </button>
         </div>
       </div>
     `;
   }).join('');
+
+  if (window.lucide) window.lucide.createIcons();
 }
+
+/**
+ * 특정 세션 완전 삭제
+ */
+window.deleteSpecificSession = async (code, title) => {
+  const confirmed = confirm(
+    `[경고] 세션 [${code}] ("${title}")을(를) 완전히 삭제하시겠습니까?\n\n` +
+    `• 세션에 포함된 모든 질문과 연수생 응답 데이터가 영구히 삭제됩니다.\n` +
+    `• 삭제 후에는 되돌릴 수 없습니다.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    await pollService.deleteRoom(code);
+    alert(`세션 [${code}]이(가) 완전히 삭제되었습니다.`);
+
+    // 만약 현재 열려있는 세션을 삭제했다면 새 세션으로 리다이렉트
+    if (code === currentRoomCode) {
+      window.location.search = '';
+    } else {
+      await renderRecentSessions();
+    }
+  } catch (err) {
+    alert('세션 삭제 중 오류가 발생했습니다: ' + err.message);
+  }
+};
+
+/**
+ * 특정 세션의 전체 질문/응답 데이터를 한 번에 CSV로 내보내기
+ */
+window.exportSpecificSessionCSV = async (code) => {
+  try {
+    const data = await pollService.getRoom(code);
+    if (!data) {
+      alert('세션 데이터를 불러올 수 없습니다.');
+      return;
+    }
+
+    const title = data.meta?.title || '연수세션';
+    const questions = data.questions || [];
+    const responses = data.responses || {};
+
+    let csvContent = "\uFEFF"; // UTF-8 BOM
+    csvContent += `세션코드,${code},세션명,"${title.replace(/"/g, '""')}"\n\n`;
+
+    if (questions.length === 0) {
+      alert('등록된 질문이 없습니다.');
+      return;
+    }
+
+    questions.forEach((q, qIdx) => {
+      csvContent += `[질문 ${qIdx + 1}] (${q.type === 'choice' ? '선택형' : '주관식'}),"${q.title.replace(/"/g, '""')}"\n`;
+      
+      const qResponses = Object.values(responses[q.id] || {});
+      if (q.type === 'choice') {
+        csvContent += "번호,작성자,제출시간,선택항목,보기내용\n";
+        qResponses.forEach((r, rIdx) => {
+          const time = new Date(r.createdAt).toLocaleString('ko-KR');
+          csvContent += `${rIdx + 1},"${r.nickname}","${time}",${(r.choiceIndex ?? 0) + 1},"${(r.choiceText || '').replace(/"/g, '""')}"\n`;
+        });
+      } else {
+        csvContent += "번호,작성자,제출시간,공감수,응답내용\n";
+        qResponses.forEach((r, rIdx) => {
+          const time = new Date(r.createdAt).toLocaleString('ko-KR');
+          csvContent += `${rIdx + 1},"${r.nickname}","${time}",${r.likes || 0},"${(r.text || '').replace(/"/g, '""')}"\n`;
+        });
+      }
+      csvContent += "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `세션전체데이터_${code}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (err) {
+    alert('데이터 내보내기 중 오류가 발생했습니다: ' + err.message);
+  }
+};
 
 window.switchSessionTo = (code) => {
   if (code === currentRoomCode) {
